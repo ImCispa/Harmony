@@ -1,0 +1,8 @@
+POST http://localhost:8080/servers
+Content-Type: application/json
+
+{
+  "name": "My Server",
+  "description": "This is my first server",
+  "owner_id": "123"
+}

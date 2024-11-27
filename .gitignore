@@ -1,0 +1,30 @@
+# Build directories
+/bin
+/pkg
+
+# Go workspace file
+go.work
+go.work.sum
+
+# Dependency directories
+/vendor/
+
+# Go-specific temporary files
+*.test
+*.out
+*.log
+
+# IDE settings
+.idea/
+.vscode/
+.fleet/
+
+# macOS
+.DS_Store
+
+# Linux
+*.swp
+
+# Windows
+Thumbs.db
+ehthumbs.db
