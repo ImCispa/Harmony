@@ -1,0 +1,7 @@
+PATCH http://localhost:8080/servers/674777cd07f0fd0a44cee1ae
+Content-Type: application/json
+
+{
+  "image": "image.png",
+  "owner_id": "ImCispa#1997"
+}

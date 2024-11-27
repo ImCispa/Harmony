@@ -3,13 +3,12 @@ package db
 import (
 	"context"
 	"fmt"
-	"log"
-	"os"
-	"time"
-
 	"github.com/joho/godotenv"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"log"
+	"os"
+	"time"
 )
 
 var Client *mongo.Client
