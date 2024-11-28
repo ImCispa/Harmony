@@ -16,6 +16,8 @@ func main() {
 	router.GET("/servers/:id", handlers.ReadServer)
 	router.PATCH("/servers/:id", handlers.UpdateServer)
 	router.DELETE("/servers/:id", handlers.DeleteServer)
+	router.GET("/servers/:id/invite", handlers.InviteServer)
+	router.POST("/servers/:uniqueName/join", handlers.JoinServer)
 
 	router.POST("/users", handlers.CreateUser)
 	router.GET("/users/:id", handlers.ReadUser)

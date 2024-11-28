@@ -11,6 +11,7 @@ type Server struct {
 	Image string `bson:"image" json:"image"`
 	OwnerID string `bson:"owner_id" json:"owner_id"`
 	UniqueName string `bson:"unique_name"`
+	Users []string `bson:"users"`
 }
 
 func (s *Server) GenerateUniqueName(code int) string {

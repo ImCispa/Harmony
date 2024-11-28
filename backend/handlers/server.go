@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"errors"
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -11,6 +12,7 @@ import (
 	"harmony/models"
 	"harmony/utils"
 	"net/http"
+	"strconv"
 	"time"
 )
 
@@ -203,6 +205,82 @@ func DeleteServer(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Failed to retreive server"})
 		return
 	}
+
+	c.Status(http.StatusNoContent)
+}
+
+func InviteServer(c *gin.Context) {
+	id := c.Param("id")
+
+	// validate input
+	objectId, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// search server
+	cServer := db.Client.Database(db.Database).Collection(collectionServers)
+	var server models.Server
+	err = cServer.FindOne(ctx, bson.M{"_id": objectId}).Decode(&server)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Failed to retreive server"})
+		return
+	}
+
+	// compose url
+	url := fmt.Sprintf("%s/servers/%s/join?t=%d", utils.GetFullHost(c), server.UniqueName, time.Now().Add(5 * time.Minute).UnixMilli())
+
+	c.JSON(http.StatusOK, gin.H{
+		"link": url,
+	})
+}
+
+func JoinServer(c *gin.Context) {
+	uniqueName := c.Param("uniqueName")
+	tOriginale := c.DefaultQuery("t", "")
+
+	// validate input
+	t, err := strconv.ParseInt(tOriginale, 10, 64)
+	if tOriginale == "" || err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to resolve t"})
+		return
+	}
+	if time.Now().UnixMilli() > t {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Join invite expired"})
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// search server
+	cServer := db.Client.Database(db.Database).Collection(collectionServers)
+	var server models.Server
+	err = cServer.FindOne(ctx, bson.M{"unique_name": uniqueName}).Decode(&server)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Failed to retreive server"})
+		return
+	}
+
+	// todo: need to take user from access token
+	server.Users = append(server.Users, "pippo")
+
+	update := bson.M{
+        "$set": bson.M{
+            "users": server.Users,
+        },
+    }
+	_, err = cServer.UpdateByID(ctx, server.ID, update)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update server"})
+		return
+	}
+
+	// todo: retreive user to insert server joined
 
 	c.Status(http.StatusNoContent)
 }
