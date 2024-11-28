@@ -25,6 +25,10 @@ func CreateServer(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	if len(server.Name) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Name required"})
+		return
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

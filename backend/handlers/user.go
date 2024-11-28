@@ -25,8 +25,20 @@ func CreateUser(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	if len(user.Name) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Name required"})
+		return
+	}
+	if len(user.Mail) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Mail required"})
+		return
+	}
+	if !utils.IsValidEmail(user.Mail) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Mail not valid"})
+		return
+	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+    ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	// check mail to see if already used
