@@ -14,8 +14,7 @@ import (
 	"time"
 )
 
-var database = "harmony"
-var collectionServer = "servers"
+var collectionServers = "servers"
 var collectionServerCodes = "server_codes"
 
 func CreateServer(c *gin.Context) {
@@ -31,7 +30,7 @@ func CreateServer(c *gin.Context) {
 	defer cancel()
 
 	// check server codes to get the one to use for the new server
-	cServerCodes := db.Client.Database(database).Collection(collectionServerCodes)
+	cServerCodes := db.Client.Database(db.Database).Collection(collectionServerCodes)
 	var serverCode models.ServerCode
 	newServerName := false
 	err := cServerCodes.FindOne(ctx, bson.M{"name": server.Name}).Decode(&serverCode)
@@ -68,7 +67,7 @@ func CreateServer(c *gin.Context) {
 
 	// creates new server
 	server.GenerateUniqueName(newCode)
-	cServers := db.Client.Database(database).Collection(collectionServer)
+	cServers := db.Client.Database(db.Database).Collection(collectionServers)
 	result, err := cServers.InsertOne(ctx, bson.M{
 		"name": server.Name,
 		"image": server.Image,
@@ -104,7 +103,7 @@ func ReadServer(c *gin.Context) {
 	defer cancel()
 
 	// search server
-	cServer := db.Client.Database(database).Collection(collectionServer)
+	cServer := db.Client.Database(db.Database).Collection(collectionServers)
 	var server models.Server
 	err = cServer.FindOne(ctx, bson.M{"_id": objectId}).Decode(&server)
 	if err != nil {
@@ -140,7 +139,7 @@ func UpdateServer(c *gin.Context) {
 	defer cancel()
 
 	// search server
-	cServer := db.Client.Database(database).Collection(collectionServer)
+	cServer := db.Client.Database(db.Database).Collection(collectionServers)
 	var server models.Server
 	err = cServer.FindOne(ctx, bson.M{"_id": objectId}).Decode(&server)
 	if err != nil {
@@ -189,7 +188,7 @@ func DeleteServer(c *gin.Context) {
 	defer cancel()
 
 	// try deleting
-	cServer := db.Client.Database(database).Collection(collectionServer)
+	cServer := db.Client.Database(db.Database).Collection(collectionServers)
 	r, err := cServer.DeleteOne(ctx, bson.M{"_id": objectId})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete server"})

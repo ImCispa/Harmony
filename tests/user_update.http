@@ -1,0 +1,6 @@
+PATCH http://localhost:8080/users/674777cd07f0fd0a44cee1ae
+Content-Type: application/json
+
+{
+  "name": "ImCispa"
+}

@@ -17,5 +17,10 @@ func main() {
 	router.PATCH("/servers/:id", handlers.UpdateServer)
 	router.DELETE("/servers/:id", handlers.DeleteServer)
 
+	router.POST("/users", handlers.CreateUser)
+	router.GET("/users/:id", handlers.ReadUser)
+	router.PATCH("/users/:id", handlers.UpdateUser)
+	router.DELETE("/users/:id", handlers.DeleteUser)
+
 	router.Run(":8080")
 }

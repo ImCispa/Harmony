@@ -12,6 +12,7 @@ import (
 )
 
 var Client *mongo.Client
+var Database = "harmony"
 
 func Init() {
 
