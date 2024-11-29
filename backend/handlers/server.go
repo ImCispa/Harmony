@@ -242,6 +242,8 @@ func InviteServer(c *gin.Context) {
 func JoinServer(c *gin.Context) {
 	uniqueName := c.Param("uniqueName")
 	tOriginale := c.DefaultQuery("t", "")
+	// todo: need to use auth
+	userName := c.GetHeader("x-harmony-username")
 
 	// validate input
 	t, err := strconv.ParseInt(tOriginale, 10, 64)
@@ -251,6 +253,10 @@ func JoinServer(c *gin.Context) {
 	}
 	if time.Now().UnixMilli() > t {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Join invite expired"})
+		return
+	}
+	if userName == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing user"})
 		return
 	}
 
@@ -266,8 +272,18 @@ func JoinServer(c *gin.Context) {
 		return
 	}
 
+	// search user
+	cUser := db.Client.Database(db.Database).Collection(collectionUsers)
+	var user models.User
+	err = cUser.FindOne(ctx, bson.M{"unique_name": userName}).Decode(&user)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Failed to retreive user"})
+		return
+	}
+
 	// todo: need to take user from access token
-	server.Users = append(server.Users, "pippo")
+	server.Users = append(server.Users, user.UniqueName)
+	user.Servers = append(user.Servers, server.UniqueName)
 
 	update := bson.M{
         "$set": bson.M{
@@ -280,6 +296,16 @@ func JoinServer(c *gin.Context) {
 		return
 	}
 
+	update = bson.M{
+        "$set": bson.M{
+            "servers": user.Servers,
+        },
+    }
+	_, err = cUser.UpdateByID(ctx, user.ID, update)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update user"})
+		return
+	}
 	// todo: retreive user to insert server joined
 
 	c.Status(http.StatusNoContent)

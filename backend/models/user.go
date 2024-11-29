@@ -10,6 +10,7 @@ type User struct {
 	Name string `bson:"name" json:"name"`
 	Mail string `bson:"mail" json:"mail"`
 	UniqueName string `bson:"unique_name"`
+	Servers []string `bson:"servers"`
 }
 
 func (u *User) GenerateUniqueName(code int) string {

@@ -1,1 +1,2 @@
-POST http://localhost:8080/servers/GWP:3359/join?t=1732826721563
+POST http://localhost:8080/servers/GWP:3359/join?t=1732907944709
+x-harmony-username: Cispa:7735
