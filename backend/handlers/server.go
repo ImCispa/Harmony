@@ -4,16 +4,17 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/gin-gonic/gin"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
 	"harmony/db"
 	"harmony/models"
 	"harmony/utils"
 	"net/http"
 	"strconv"
 	"time"
+
+	"github.com/gin-gonic/gin"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 var collectionServers = "servers"
@@ -51,7 +52,7 @@ func CreateServer(c *gin.Context) {
 	newCode := utils.GetRandomCode(serverCode.Codes)
 	if newServerName {
 		_, err := cServerCodes.InsertOne(ctx, bson.M{
-			"name": server.Name,
+			"name":  server.Name,
 			"codes": []int{newCode},
 		})
 		if err != nil {
@@ -60,10 +61,10 @@ func CreateServer(c *gin.Context) {
 		}
 	} else {
 		update := bson.M{
-	        "$set": bson.M{
-	            "codes": append(serverCode.Codes, newCode),
-	        },
-	    }
+			"$set": bson.M{
+				"codes": append(serverCode.Codes, newCode),
+			},
+		}
 		_, err = cServerCodes.UpdateByID(ctx, serverCode.ID, update)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update server codes"})
@@ -75,9 +76,9 @@ func CreateServer(c *gin.Context) {
 	server.GenerateUniqueName(newCode)
 	cServers := db.Client.Database(db.Database).Collection(collectionServers)
 	result, err := cServers.InsertOne(ctx, bson.M{
-		"name": server.Name,
-		"image": server.Image,
-		"owner_id": server.OwnerID,
+		"name":        server.Name,
+		"image":       server.Image,
+		"owner_id":    server.OwnerID,
 		"unique_name": server.UniqueName,
 	})
 
@@ -87,10 +88,10 @@ func CreateServer(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, gin.H{
-		"id": result.InsertedID,
-		"name": server.Name,
-		"image": server.Image,
-		"owner_id": server.OwnerID,
+		"id":          result.InsertedID,
+		"name":        server.Name,
+		"image":       server.Image,
+		"owner_id":    server.OwnerID,
 		"unique_name": server.UniqueName,
 	})
 }
@@ -118,10 +119,10 @@ func ReadServer(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"id": server.ID,
-		"name": server.Name,
-		"image": server.Image,
-		"owner_id": server.OwnerID,
+		"id":          server.ID,
+		"name":        server.Name,
+		"image":       server.Image,
+		"owner_id":    server.OwnerID,
 		"unique_name": server.UniqueName,
 	})
 }
@@ -159,12 +160,12 @@ func UpdateServer(c *gin.Context) {
 	server.OwnerID = in.OwnerID
 
 	update := bson.M{
-        "$set": bson.M{
-            "name": server.Name,
-			"image": server.Image,
+		"$set": bson.M{
+			"name":     server.Name,
+			"image":    server.Image,
 			"owner_id": server.OwnerID,
-        },
-    }
+		},
+	}
 	_, err = cServer.UpdateByID(ctx, objectId, update)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update server"})
@@ -172,10 +173,10 @@ func UpdateServer(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"id": server.ID,
-		"name": server.Name,
-		"image": server.Image,
-		"owner_id": server.OwnerID,
+		"id":          server.ID,
+		"name":        server.Name,
+		"image":       server.Image,
+		"owner_id":    server.OwnerID,
 		"unique_name": server.UniqueName,
 	})
 }
@@ -232,7 +233,7 @@ func InviteServer(c *gin.Context) {
 	}
 
 	// compose url
-	url := fmt.Sprintf("%s/servers/%s/join?t=%d", utils.GetFullHost(c), server.UniqueName, time.Now().Add(5 * time.Minute).UnixMilli())
+	url := fmt.Sprintf("%s/servers/%s/join?t=%d", utils.GetFullHost(c), server.ID.Hex(), time.Now().Add(5*time.Minute).UnixMilli())
 
 	c.JSON(http.StatusOK, gin.H{
 		"link": url,
@@ -240,12 +241,17 @@ func InviteServer(c *gin.Context) {
 }
 
 func JoinServer(c *gin.Context) {
-	uniqueName := c.Param("uniqueName")
+	id := c.Param("id")
 	tOriginale := c.DefaultQuery("t", "")
 	// todo: need to use auth
 	userName := c.GetHeader("x-harmony-username")
 
 	// validate input
+	objectId, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 	t, err := strconv.ParseInt(tOriginale, 10, 64)
 	if tOriginale == "" || err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to resolve t"})
@@ -266,7 +272,7 @@ func JoinServer(c *gin.Context) {
 	// search server
 	cServer := db.Client.Database(db.Database).Collection(collectionServers)
 	var server models.Server
-	err = cServer.FindOne(ctx, bson.M{"unique_name": uniqueName}).Decode(&server)
+	err = cServer.FindOne(ctx, bson.M{"_id": objectId}).Decode(&server)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Failed to retreive server"})
 		return
@@ -281,15 +287,21 @@ func JoinServer(c *gin.Context) {
 		return
 	}
 
+	// check already in the list
+	if utils.Contains(server.Users, user.UniqueName) || utils.Contains(user.Servers, server.UniqueName) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "User already joined server"})
+		return
+	}
+
 	// todo: need to take user from access token
 	server.Users = append(server.Users, user.UniqueName)
 	user.Servers = append(user.Servers, server.UniqueName)
 
 	update := bson.M{
-        "$set": bson.M{
-            "users": server.Users,
-        },
-    }
+		"$set": bson.M{
+			"users": server.Users,
+		},
+	}
 	_, err = cServer.UpdateByID(ctx, server.ID, update)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update server"})
@@ -297,16 +309,87 @@ func JoinServer(c *gin.Context) {
 	}
 
 	update = bson.M{
-        "$set": bson.M{
-            "servers": user.Servers,
-        },
-    }
+		"$set": bson.M{
+			"servers": user.Servers,
+		},
+	}
 	_, err = cUser.UpdateByID(ctx, user.ID, update)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update user"})
 		return
 	}
-	// todo: retreive user to insert server joined
+
+	c.Status(http.StatusNoContent)
+}
+
+func LeaveServer(c *gin.Context) {
+	id := c.Param("id")
+	// todo: need to use auth
+	userName := c.GetHeader("x-harmony-username")
+
+	// validate input
+	objectId, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if userName == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing user"})
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// search server
+	cServer := db.Client.Database(db.Database).Collection(collectionServers)
+	var server models.Server
+	err = cServer.FindOne(ctx, bson.M{"_id": objectId}).Decode(&server)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Failed to retreive server"})
+		return
+	}
+
+	// search user
+	cUser := db.Client.Database(db.Database).Collection(collectionUsers)
+	var user models.User
+	err = cUser.FindOne(ctx, bson.M{"unique_name": userName}).Decode(&user)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Failed to retreive user"})
+		return
+	}
+
+	// check already in the list
+	if !utils.Contains(server.Users, user.UniqueName) && !utils.Contains(user.Servers, server.UniqueName) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "User not in the server"})
+		return
+	}
+
+	// todo: need to take user from access token
+	server.Users = utils.Remove(server.Users, user.UniqueName)
+	user.Servers = utils.Remove(user.Servers, server.UniqueName)
+
+	update := bson.M{
+		"$set": bson.M{
+			"users": server.Users,
+		},
+	}
+	_, err = cServer.UpdateByID(ctx, server.ID, update)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update server"})
+		return
+	}
+
+	update = bson.M{
+		"$set": bson.M{
+			"servers": user.Servers,
+		},
+	}
+	_, err = cUser.UpdateByID(ctx, user.ID, update)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update user"})
+		return
+	}
 
 	c.Status(http.StatusNoContent)
 }

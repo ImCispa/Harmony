@@ -1,9 +1,10 @@
 package main
 
 import (
-	"github.com/gin-gonic/gin"
 	"harmony/db"
 	"harmony/handlers"
+
+	"github.com/gin-gonic/gin"
 )
 
 func main() {
@@ -17,7 +18,8 @@ func main() {
 	router.PATCH("/servers/:id", handlers.UpdateServer)
 	router.DELETE("/servers/:id", handlers.DeleteServer)
 	router.GET("/servers/:id/invite", handlers.InviteServer)
-	router.POST("/servers/:uniqueName/join", handlers.JoinServer)
+	router.POST("/servers/:id/join", handlers.JoinServer)
+	router.POST("/servers/:id/leave", handlers.LeaveServer)
 
 	router.POST("/users", handlers.CreateUser)
 	router.GET("/users/:id", handlers.ReadUser)
