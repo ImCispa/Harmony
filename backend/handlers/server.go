@@ -36,11 +36,20 @@ func CreateServer(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
+	// check user exist
+	cUser := db.Client.Database(db.Database).Collection(collectionUsers)
+	var user models.User
+	err := cUser.FindOne(ctx, bson.M{"unique_name": server.OwnerID}).Decode(&user)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Failed to retreive user"})
+		return
+	}
+
 	// check server codes to get the one to use for the new server
 	cServerCodes := db.Client.Database(db.Database).Collection(collectionServerCodes)
 	var serverCode models.ServerCode
 	newServerName := false
-	err := cServerCodes.FindOne(ctx, bson.M{"name": server.Name}).Decode(&serverCode)
+	err = cServerCodes.FindOne(ctx, bson.M{"name": server.Name}).Decode(&serverCode)
 	if err != nil {
 		if !errors.Is(err, mongo.ErrNoDocuments) {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check server name"})
@@ -80,10 +89,21 @@ func CreateServer(c *gin.Context) {
 		"image":       server.Image,
 		"owner_id":    server.OwnerID,
 		"unique_name": server.UniqueName,
+		"users":       []string{server.OwnerID},
 	})
-
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create server"})
+		return
+	}
+
+	update := bson.M{
+		"$set": bson.M{
+			"servers": append(user.Servers, server.UniqueName),
+		},
+	}
+	_, err = cUser.UpdateByID(ctx, user.ID, update)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update user"})
 		return
 	}
 
@@ -93,6 +113,7 @@ func CreateServer(c *gin.Context) {
 		"image":       server.Image,
 		"owner_id":    server.OwnerID,
 		"unique_name": server.UniqueName,
+		"users":       []string{server.OwnerID},
 	})
 }
 
@@ -124,6 +145,7 @@ func ReadServer(c *gin.Context) {
 		"image":       server.Image,
 		"owner_id":    server.OwnerID,
 		"unique_name": server.UniqueName,
+		"users":       server.Users,
 	})
 }
 
@@ -178,6 +200,7 @@ func UpdateServer(c *gin.Context) {
 		"image":       server.Image,
 		"owner_id":    server.OwnerID,
 		"unique_name": server.UniqueName,
+		"users":       server.Users,
 	})
 }
 
@@ -356,6 +379,11 @@ func LeaveServer(c *gin.Context) {
 	err = cUser.FindOne(ctx, bson.M{"unique_name": userName}).Decode(&user)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Failed to retreive user"})
+		return
+	}
+
+	if userName == server.OwnerID {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Owner cannot leave server"})
 		return
 	}
 

@@ -3,15 +3,16 @@ package handlers
 import (
 	"context"
 	"errors"
-	"github.com/gin-gonic/gin"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
 	"harmony/db"
 	"harmony/models"
 	"harmony/utils"
 	"net/http"
 	"time"
+
+	"github.com/gin-gonic/gin"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 var collectionUsers = "users"
@@ -38,7 +39,7 @@ func CreateUser(c *gin.Context) {
 		return
 	}
 
-    ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	// check mail to see if already used
@@ -78,10 +79,10 @@ func CreateUser(c *gin.Context) {
 		}
 	} else {
 		update := bson.M{
-	        "$set": bson.M{
-	            "codes": append(userCode.Codes, newCode),
-	        },
-	    }
+			"$set": bson.M{
+				"codes": append(userCode.Codes, newCode),
+			},
+		}
 		_, err = cUserCodes.UpdateByID(ctx, userCode.ID, update)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update user codes"})
@@ -92,8 +93,8 @@ func CreateUser(c *gin.Context) {
 	// creates new user
 	user.GenerateUniqueName(newCode)
 	result, err := cUsers.InsertOne(ctx, bson.M{
-		"name": user.Name,
-		"mail": user.Mail,
+		"name":        user.Name,
+		"mail":        user.Mail,
 		"unique_name": user.UniqueName,
 	})
 
@@ -107,6 +108,7 @@ func CreateUser(c *gin.Context) {
 		"name":        user.Name,
 		"mail":        user.Mail,
 		"unique_name": user.UniqueName,
+		"servers":     user.Servers,
 	})
 }
 
@@ -135,8 +137,9 @@ func ReadUser(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"id":          user.ID,
 		"name":        user.Name,
-		"mail":       user.Mail,
+		"mail":        user.Mail,
 		"unique_name": user.UniqueName,
+		"servers":     user.Servers,
 	})
 }
 
@@ -171,10 +174,10 @@ func UpdateUser(c *gin.Context) {
 	user.Name = in.Name
 
 	update := bson.M{
-        "$set": bson.M{
-            "name":     user.Name,
-        },
-    }
+		"$set": bson.M{
+			"name": user.Name,
+		},
+	}
 	_, err = cUser.UpdateByID(ctx, objectId, update)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update user"})
@@ -184,8 +187,9 @@ func UpdateUser(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"id":          user.ID,
 		"name":        user.Name,
-		"mail":       user.Mail,
+		"mail":        user.Mail,
 		"unique_name": user.UniqueName,
+		"servers":     user.Servers,
 	})
 }
 
