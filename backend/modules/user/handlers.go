@@ -2,7 +2,6 @@ package user
 
 import (
 	"context"
-	"errors"
 	"harmony/internal/database"
 	"harmony/utils"
 	"net/http"
@@ -15,16 +14,19 @@ import (
 )
 
 type Handler struct {
-	DB *mongo.Client
+	DB   *mongo.Client
+	Repo *Repository
 }
 
 func NewHandler(db *database.Service) *Handler {
-	return &Handler{DB: db.Mongo}
+	return &Handler{
+		DB:   db.Mongo,
+		Repo: NewRepository(db.Mongo),
+	}
 }
 
 var databaseName = "harmony"
 var collectionUsers = "users"
-var collectionUserCodes = "user_codes"
 
 func (h *Handler) Create(c *gin.Context) {
 	var user User
@@ -47,72 +49,26 @@ func (h *Handler) Create(c *gin.Context) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
 	// check mail to see if already used
-	cUsers := h.DB.Database(databaseName).Collection(collectionUsers)
-	var uMailUsed User
-	err := cUsers.FindOne(ctx, bson.M{"mail": user.Mail}).Decode(&uMailUsed)
-	if err != nil && !errors.Is(err, mongo.ErrNoDocuments) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Mail already used"})
-		return
-	} else if uMailUsed.Mail == user.Mail {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Mail already used"})
-		return
-	}
-
-	// check user codes to get the one to use for the new user
-	cUserCodes := h.DB.Database(databaseName).Collection(collectionUserCodes)
-	var userCode UserCode
-	newUserName := false
-	err = cUserCodes.FindOne(ctx, bson.M{"name": user.Name}).Decode(&userCode)
+	isMailUsed, err := h.Repo.IsMailUsed(user.Mail)
 	if err != nil {
-		if !errors.Is(err, mongo.ErrNoDocuments) {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check user name"})
-			return
-		}
-		newUserName = true
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Falied"})
+		return
+	}
+	if isMailUsed {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Mail already used"})
+		return
 	}
 
-	newCode := utils.GetRandomCode(userCode.Codes)
-	if newUserName {
-		_, err := cUserCodes.InsertOne(ctx, bson.M{
-			"name":  user.Name,
-			"codes": []int{newCode},
-		})
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user codes"})
-			return
-		}
-	} else {
-		update := bson.M{
-			"$set": bson.M{
-				"codes": append(userCode.Codes, newCode),
-			},
-		}
-		_, err = cUserCodes.UpdateByID(ctx, userCode.ID, update)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update user codes"})
-			return
-		}
-	}
-
-	// creates new user
-	user.GenerateUniqueName(newCode)
-	result, err := cUsers.InsertOne(ctx, bson.M{
-		"name":        user.Name,
-		"mail":        user.Mail,
-		"unique_name": user.UniqueName,
-	})
-
+	// create
+	err = h.Repo.CreateUser(&user)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user"})
 		return
 	}
 
 	c.JSON(http.StatusCreated, gin.H{
-		"id":          result.InsertedID,
+		"id":          user.ID,
 		"name":        user.Name,
 		"mail":        user.Mail,
 		"unique_name": user.UniqueName,
