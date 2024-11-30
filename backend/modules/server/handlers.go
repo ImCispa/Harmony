@@ -1,11 +1,11 @@
-package handlers
+package server
 
 import (
 	"context"
 	"errors"
 	"fmt"
-	"harmony/db"
-	"harmony/models"
+	"harmony/internal/database"
+	"harmony/modules/user"
 	"harmony/utils"
 	"net/http"
 	"strconv"
@@ -17,11 +17,21 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
+type Handler struct {
+	DB *mongo.Client
+}
+
+func NewHandler(db *database.Service) *Handler {
+	return &Handler{DB: db.Mongo}
+}
+
+var databaseName = "harmony"
 var collectionServers = "servers"
 var collectionServerCodes = "server_codes"
+var collectionUsers = "users"
 
-func CreateServer(c *gin.Context) {
-	var server models.Server
+func (h *Handler) Create(c *gin.Context) {
+	var server Server
 
 	// validate input
 	if err := c.ShouldBindJSON(&server); err != nil {
@@ -37,8 +47,8 @@ func CreateServer(c *gin.Context) {
 	defer cancel()
 
 	// check user exist
-	cUser := db.Client.Database(db.Database).Collection(collectionUsers)
-	var user models.User
+	cUser := h.DB.Database(databaseName).Collection(collectionUsers)
+	var user user.User
 	err := cUser.FindOne(ctx, bson.M{"unique_name": server.OwnerID}).Decode(&user)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Failed to retreive user"})
@@ -46,8 +56,8 @@ func CreateServer(c *gin.Context) {
 	}
 
 	// check server codes to get the one to use for the new server
-	cServerCodes := db.Client.Database(db.Database).Collection(collectionServerCodes)
-	var serverCode models.ServerCode
+	cServerCodes := h.DB.Database(databaseName).Collection(collectionServerCodes)
+	var serverCode ServerCode
 	newServerName := false
 	err = cServerCodes.FindOne(ctx, bson.M{"name": server.Name}).Decode(&serverCode)
 	if err != nil {
@@ -83,7 +93,7 @@ func CreateServer(c *gin.Context) {
 
 	// creates new server
 	server.GenerateUniqueName(newCode)
-	cServers := db.Client.Database(db.Database).Collection(collectionServers)
+	cServers := h.DB.Database(databaseName).Collection(collectionServers)
 	result, err := cServers.InsertOne(ctx, bson.M{
 		"name":        server.Name,
 		"image":       server.Image,
@@ -117,7 +127,7 @@ func CreateServer(c *gin.Context) {
 	})
 }
 
-func ReadServer(c *gin.Context) {
+func (h *Handler) Read(c *gin.Context) {
 	id := c.Param("id")
 
 	// validate input
@@ -131,8 +141,8 @@ func ReadServer(c *gin.Context) {
 	defer cancel()
 
 	// search server
-	cServer := db.Client.Database(db.Database).Collection(collectionServers)
-	var server models.Server
+	cServer := h.DB.Database(databaseName).Collection(collectionServers)
+	var server Server
 	err = cServer.FindOne(ctx, bson.M{"_id": objectId}).Decode(&server)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Failed to retreive server"})
@@ -149,7 +159,7 @@ func ReadServer(c *gin.Context) {
 	})
 }
 
-func UpdateServer(c *gin.Context) {
+func (h *Handler) Update(c *gin.Context) {
 	id := c.Param("id")
 
 	// validate input
@@ -158,7 +168,7 @@ func UpdateServer(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	var in models.Server
+	var in Server
 	if err := c.ShouldBindJSON(&in); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -168,8 +178,8 @@ func UpdateServer(c *gin.Context) {
 	defer cancel()
 
 	// search server
-	cServer := db.Client.Database(db.Database).Collection(collectionServers)
-	var server models.Server
+	cServer := h.DB.Database(databaseName).Collection(collectionServers)
+	var server Server
 	err = cServer.FindOne(ctx, bson.M{"_id": objectId}).Decode(&server)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Failed to retreive server"})
@@ -204,7 +214,7 @@ func UpdateServer(c *gin.Context) {
 	})
 }
 
-func DeleteServer(c *gin.Context) {
+func (h *Handler) Delete(c *gin.Context) {
 	id := c.Param("id")
 
 	// validate input
@@ -218,7 +228,7 @@ func DeleteServer(c *gin.Context) {
 	defer cancel()
 
 	// try deleting
-	cServer := db.Client.Database(db.Database).Collection(collectionServers)
+	cServer := h.DB.Database(databaseName).Collection(collectionServers)
 	r, err := cServer.DeleteOne(ctx, bson.M{"_id": objectId})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete server"})
@@ -233,7 +243,7 @@ func DeleteServer(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
-func InviteServer(c *gin.Context) {
+func (h *Handler) Invite(c *gin.Context) {
 	id := c.Param("id")
 
 	// validate input
@@ -247,8 +257,8 @@ func InviteServer(c *gin.Context) {
 	defer cancel()
 
 	// search server
-	cServer := db.Client.Database(db.Database).Collection(collectionServers)
-	var server models.Server
+	cServer := h.DB.Database(databaseName).Collection(collectionServers)
+	var server Server
 	err = cServer.FindOne(ctx, bson.M{"_id": objectId}).Decode(&server)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Failed to retreive server"})
@@ -263,7 +273,7 @@ func InviteServer(c *gin.Context) {
 	})
 }
 
-func JoinServer(c *gin.Context) {
+func (h *Handler) Join(c *gin.Context) {
 	id := c.Param("id")
 	tOriginale := c.DefaultQuery("t", "")
 	// todo: need to use auth
@@ -293,8 +303,8 @@ func JoinServer(c *gin.Context) {
 	defer cancel()
 
 	// search server
-	cServer := db.Client.Database(db.Database).Collection(collectionServers)
-	var server models.Server
+	cServer := h.DB.Database(databaseName).Collection(collectionServers)
+	var server Server
 	err = cServer.FindOne(ctx, bson.M{"_id": objectId}).Decode(&server)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Failed to retreive server"})
@@ -302,8 +312,8 @@ func JoinServer(c *gin.Context) {
 	}
 
 	// search user
-	cUser := db.Client.Database(db.Database).Collection(collectionUsers)
-	var user models.User
+	cUser := h.DB.Database(databaseName).Collection(collectionUsers)
+	var user user.User
 	err = cUser.FindOne(ctx, bson.M{"unique_name": userName}).Decode(&user)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Failed to retreive user"})
@@ -345,7 +355,7 @@ func JoinServer(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
-func LeaveServer(c *gin.Context) {
+func (h *Handler) Leave(c *gin.Context) {
 	id := c.Param("id")
 	// todo: need to use auth
 	userName := c.GetHeader("x-harmony-username")
@@ -365,8 +375,8 @@ func LeaveServer(c *gin.Context) {
 	defer cancel()
 
 	// search server
-	cServer := db.Client.Database(db.Database).Collection(collectionServers)
-	var server models.Server
+	cServer := h.DB.Database(databaseName).Collection(collectionServers)
+	var server Server
 	err = cServer.FindOne(ctx, bson.M{"_id": objectId}).Decode(&server)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Failed to retreive server"})
@@ -374,8 +384,8 @@ func LeaveServer(c *gin.Context) {
 	}
 
 	// search user
-	cUser := db.Client.Database(db.Database).Collection(collectionUsers)
-	var user models.User
+	cUser := h.DB.Database(databaseName).Collection(collectionUsers)
+	var user user.User
 	err = cUser.FindOne(ctx, bson.M{"unique_name": userName}).Decode(&user)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Failed to retreive user"})

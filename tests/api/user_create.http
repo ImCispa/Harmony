@@ -2,6 +2,6 @@ POST http://localhost:8080/users
 Content-Type: application/json
 
 {
-  "name": "Cispita",
-  "mail": "m@foo2.com"
+  "name": "Cispa",
+  "mail": "m@foo.com"
 }

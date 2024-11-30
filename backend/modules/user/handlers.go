@@ -1,10 +1,9 @@
-package handlers
+package user
 
 import (
 	"context"
 	"errors"
-	"harmony/db"
-	"harmony/models"
+	"harmony/internal/database"
 	"harmony/utils"
 	"net/http"
 	"time"
@@ -15,11 +14,20 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
+type Handler struct {
+	DB *mongo.Client
+}
+
+func NewHandler(db *database.Service) *Handler {
+	return &Handler{DB: db.Mongo}
+}
+
+var databaseName = "harmony"
 var collectionUsers = "users"
 var collectionUserCodes = "user_codes"
 
-func CreateUser(c *gin.Context) {
-	var user models.User
+func (h *Handler) Create(c *gin.Context) {
+	var user User
 
 	// validate input
 	if err := c.ShouldBindJSON(&user); err != nil {
@@ -43,8 +51,8 @@ func CreateUser(c *gin.Context) {
 	defer cancel()
 
 	// check mail to see if already used
-	cUsers := db.Client.Database(db.Database).Collection(collectionUsers)
-	var uMailUsed models.User
+	cUsers := h.DB.Database(databaseName).Collection(collectionUsers)
+	var uMailUsed User
 	err := cUsers.FindOne(ctx, bson.M{"mail": user.Mail}).Decode(&uMailUsed)
 	if err != nil && !errors.Is(err, mongo.ErrNoDocuments) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Mail already used"})
@@ -55,8 +63,8 @@ func CreateUser(c *gin.Context) {
 	}
 
 	// check user codes to get the one to use for the new user
-	cUserCodes := db.Client.Database(db.Database).Collection(collectionUserCodes)
-	var userCode models.UserCode
+	cUserCodes := h.DB.Database(databaseName).Collection(collectionUserCodes)
+	var userCode UserCode
 	newUserName := false
 	err = cUserCodes.FindOne(ctx, bson.M{"name": user.Name}).Decode(&userCode)
 	if err != nil {
@@ -112,7 +120,7 @@ func CreateUser(c *gin.Context) {
 	})
 }
 
-func ReadUser(c *gin.Context) {
+func (h *Handler) Read(c *gin.Context) {
 	id := c.Param("id")
 
 	// validate input
@@ -126,8 +134,8 @@ func ReadUser(c *gin.Context) {
 	defer cancel()
 
 	// search user
-	cUser := db.Client.Database(db.Database).Collection(collectionUsers)
-	var user models.User
+	cUser := h.DB.Database(databaseName).Collection(collectionUsers)
+	var user User
 	err = cUser.FindOne(ctx, bson.M{"_id": objectId}).Decode(&user)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Failed to retreive user"})
@@ -143,7 +151,7 @@ func ReadUser(c *gin.Context) {
 	})
 }
 
-func UpdateUser(c *gin.Context) {
+func (h *Handler) Update(c *gin.Context) {
 	id := c.Param("id")
 
 	// validate input
@@ -152,7 +160,7 @@ func UpdateUser(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	var in models.Server
+	var in User
 	if err := c.ShouldBindJSON(&in); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -162,8 +170,8 @@ func UpdateUser(c *gin.Context) {
 	defer cancel()
 
 	// search user
-	cUser := db.Client.Database(db.Database).Collection(collectionUsers)
-	var user models.User
+	cUser := h.DB.Database(databaseName).Collection(collectionUsers)
+	var user User
 	err = cUser.FindOne(ctx, bson.M{"_id": objectId}).Decode(&user)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Failed to retreive user"})
@@ -193,7 +201,7 @@ func UpdateUser(c *gin.Context) {
 	})
 }
 
-func DeleteUser(c *gin.Context) {
+func (h *Handler) Delete(c *gin.Context) {
 	id := c.Param("id")
 
 	// validate input
@@ -207,7 +215,7 @@ func DeleteUser(c *gin.Context) {
 	defer cancel()
 
 	// try deleting
-	cUser := db.Client.Database(db.Database).Collection(collectionUsers)
+	cUser := h.DB.Database(databaseName).Collection(collectionUsers)
 	r, err := cUser.DeleteOne(ctx, bson.M{"_id": objectId})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete user"})
