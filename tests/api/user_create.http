@@ -3,5 +3,5 @@ Content-Type: application/json
 
 {
   "name": "Cispa",
-  "mail": "m@foo1.com"
+  "mail": "m1@foo.com"
 }

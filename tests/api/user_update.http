@@ -1,6 +1,6 @@
-PATCH http://localhost:8080/users/6748c4fafee35a8e3ccd7bd9
+PATCH http://localhost:8080/users/674cc3b0cf78833e768c051b
 Content-Type: application/json
 
 {
-  "name": "ImCispa"
+  "name": "ImCispaElMe@jor"
 }
