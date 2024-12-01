@@ -28,7 +28,10 @@ func (r *Repository) IsMailUsed(mail string) (bool, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
 	defer cancel()
 
-	err := cUsers.FindOne(ctx, bson.M{"mail": mail}).Decode(&user)
+	filter := bson.M{
+		"mail": mail,
+	}
+	err := cUsers.FindOne(ctx, filter).Decode(&user)
 	if err != nil {
 		if errors.Is(err, mongo.ErrNoDocuments) {
 			return false, nil
@@ -47,7 +50,10 @@ func (r *Repository) Create(user *User) error {
 
 	var userCode UserCode
 	newUserName := false
-	err := cUserCodes.FindOne(ctx, bson.M{"name": user.Name}).Decode(&userCode)
+	filter := bson.M{
+		"name": user.Name,
+	}
+	err := cUserCodes.FindOne(ctx, filter).Decode(&userCode)
 	if err != nil {
 		if !errors.Is(err, mongo.ErrNoDocuments) {
 			return err
