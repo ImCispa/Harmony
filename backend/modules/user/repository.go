@@ -38,7 +38,7 @@ func (r *Repository) IsMailUsed(mail string) (bool, error) {
 	return true, nil
 }
 
-func (r *Repository) CreateUser(user *User) error {
+func (r *Repository) Create(user *User) error {
 	cUserCodes := r.db.Collection("user_codes")
 	cUsers := r.db.Collection("users")
 
@@ -91,4 +91,60 @@ func (r *Repository) CreateUser(user *User) error {
 	user.ID = result.InsertedID.(primitive.ObjectID)
 
 	return nil
+}
+
+func (r *Repository) Read(id primitive.ObjectID) (*User, error) {
+	cUsers := r.db.Collection("users")
+
+	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
+	defer cancel()
+
+	var user User
+	err := cUsers.FindOne(ctx, bson.M{"_id": id}).Decode(&user)
+	if err != nil {
+		return nil, err
+	}
+
+	return &user, nil
+}
+
+func (r *Repository) Update(user User) error {
+	cUsers := r.db.Collection("users")
+
+	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
+	defer cancel()
+
+	// cannot update:
+	// - mail
+	// - unique name
+	update := bson.M{
+		"$set": bson.M{
+			"name":    user.Name,
+			"servers": user.Servers,
+		},
+	}
+	_, err := cUsers.UpdateByID(ctx, user.ID, update)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (r *Repository) Delete(id primitive.ObjectID) (bool, error) {
+	cUsers := r.db.Collection("users")
+
+	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
+	defer cancel()
+
+	result, err := cUsers.DeleteOne(ctx, bson.M{"_id": id})
+	if err != nil {
+		return false, err
+	}
+
+	if result.DeletedCount == 0 {
+		return false, nil
+	}
+
+	return true, nil
 }

@@ -1,14 +1,11 @@
 package user
 
 import (
-	"context"
 	"harmony/internal/database"
 	"harmony/utils"
 	"net/http"
-	"time"
 
 	"github.com/gin-gonic/gin"
-	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -24,9 +21,6 @@ func NewHandler(db *database.Service) *Handler {
 		Repo: NewRepository(db.Mongo),
 	}
 }
-
-var databaseName = "harmony"
-var collectionUsers = "users"
 
 func (h *Handler) Create(c *gin.Context) {
 	var user User
@@ -61,7 +55,7 @@ func (h *Handler) Create(c *gin.Context) {
 	}
 
 	// create
-	err = h.Repo.CreateUser(&user)
+	err = h.Repo.Create(&user)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user"})
 		return
@@ -86,13 +80,8 @@ func (h *Handler) Read(c *gin.Context) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
 	// search user
-	cUser := h.DB.Database(databaseName).Collection(collectionUsers)
-	var user User
-	err = cUser.FindOne(ctx, bson.M{"_id": objectId}).Decode(&user)
+	user, err := h.Repo.Read(objectId)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Failed to retreive user"})
 		return
@@ -122,13 +111,8 @@ func (h *Handler) Update(c *gin.Context) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
 	// search user
-	cUser := h.DB.Database(databaseName).Collection(collectionUsers)
-	var user User
-	err = cUser.FindOne(ctx, bson.M{"_id": objectId}).Decode(&user)
+	user, err := h.Repo.Read(objectId)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Failed to retreive user"})
 		return
@@ -137,12 +121,7 @@ func (h *Handler) Update(c *gin.Context) {
 	// update data
 	user.Name = in.Name
 
-	update := bson.M{
-		"$set": bson.M{
-			"name": user.Name,
-		},
-	}
-	_, err = cUser.UpdateByID(ctx, objectId, update)
+	err = h.Repo.Update(*user)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update user"})
 		return
@@ -167,18 +146,14 @@ func (h *Handler) Delete(c *gin.Context) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
 	// try deleting
-	cUser := h.DB.Database(databaseName).Collection(collectionUsers)
-	r, err := cUser.DeleteOne(ctx, bson.M{"_id": objectId})
+	isDeleted, err := h.Repo.Delete(objectId)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete user"})
 		return
 	}
 
-	if r.DeletedCount == 0 {
+	if !isDeleted {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Failed to retreive user"})
 		return
 	}
