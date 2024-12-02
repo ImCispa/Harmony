@@ -1,7 +1,7 @@
-POST http://localhost:8080/users
+POST http://localhost:8080/user/registration
 Content-Type: application/json
 
 {
   "name": "Cispa",
-  "mail": "m1@foo.com"
+  "mail": "christian.perico.1997@gmail.com"
 }

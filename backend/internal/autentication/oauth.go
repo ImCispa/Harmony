@@ -25,7 +25,7 @@ var (
 func New() Service {
 	ctx := context.Background()
 
-	provider, err := oidc.NewProvider(ctx, providerURL)
+	providerInternal, err := oidc.NewProvider(ctx, providerURL)
 	if err != nil {
 		log.Fatalf("Failed to get provider: %v", err)
 	}
@@ -33,12 +33,12 @@ func New() Service {
 	oauth2Config := &oauth2.Config{
 		ClientID:     clientID,
 		ClientSecret: clientSecret,
-		Endpoint:     provider.Endpoint(),
+		Endpoint:     providerInternal.Endpoint(),
 		RedirectURL:  redirectURL,
 		Scopes:       []string{oidc.ScopeOpenID, "profile", "email"},
 	}
 
-	oidcVerifier := provider.Verifier(&oidc.Config{ClientID: clientID})
+	oidcVerifier := providerInternal.Verifier(&oidc.Config{ClientID: clientID})
 
 	return Service{
 		Oauth2Config: oauth2Config,

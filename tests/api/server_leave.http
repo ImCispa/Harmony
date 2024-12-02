@@ -1,2 +1,3 @@
-POST http://localhost:8080/servers/674dc6276be95aed48712bd2/leave
-x-harmony-username: Cispa:6802
+POST http://localhost:8080/servers/674e10a64aa5fa06f7016f79/leave
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJZOEFPdUVGVmZxeXdvanBET0RtYjZsTUpWeVhMNkhsUSIsImV4cCI6MTczMzE3MDExOCwiaWF0IjoxNzMzMTY5MjE4LCJuYmYiOjE3MzMxNjg5MTgsInN1YiI6IkNpc3BhOjE0MDkifQ.boV2DmbIahzf2JbPKbPLpttIseY7TOJ0XKad7HtaEkg
+

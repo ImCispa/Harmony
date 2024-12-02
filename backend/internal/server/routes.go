@@ -2,12 +2,14 @@ package server
 
 import (
 	"context"
+	"fmt"
 	"net/http"
-	"strings"
+	"time"
 
 	"harmony/modules/server"
 	"harmony/modules/user"
 
+	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"golang.org/x/oauth2"
@@ -32,6 +34,8 @@ func (s *Server) RegisterRoutes() http.Handler {
 	server.RegisterRoutes(serverGroup, serverHandler)
 
 	userHandler := user.NewHandler(&s.db)
+	userRegGroup := r.Group("/user/registration")
+	user.RegisterRoutesNoAuth(userRegGroup, userHandler)
 	userGroup := r.Group("/users", s.authMiddleware())
 	user.RegisterRoutes(userGroup, userHandler)
 
@@ -66,7 +70,7 @@ func (s *Server) callbackHandler(c *gin.Context) {
 
 	token, err := s.auth.Oauth2Config.Exchange(ctx, code)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to exchange token", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to exchange token"})
 		return
 	}
 
@@ -76,25 +80,46 @@ func (s *Server) callbackHandler(c *gin.Context) {
 		return
 	}
 
-	//idToken, err := s.auth.OidcVerifierOauth.Verify(ctx, rawIDToken)
-	//if err != nil {
-	//	c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify ID Token", "details": err.Error()})
-	//	return
-	//}
+	idToken, err := s.auth.OidcVerifier.Verify(ctx, rawIDToken)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify ID Token"})
+		return
+	}
 
-	//var claims map[string]interface{}
-	//if err := idToken.Claims(&claims); err != nil {
-	//	c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to parse claims", "details": err.Error()})
-	//	return
-	//}
+	var claims map[string]interface{}
+	if err := idToken.Claims(&claims); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to parse claims"})
+		return
+	}
 
-	//email := claims["email"].(string)
+	email := claims["email"].(string)
 
-	c.SetCookie("token", rawIDToken, 3600, "/", s.host, false, true)
+	userRepo := user.NewRepository(s.db.Mongo)
+	user, err := userRepo.ReadByMail(email)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed in get user"})
+		return
+	}
+
+	newClaims := jwt.MapClaims{
+		"sub": user.UniqueName,
+		"exp": time.Now().Add(time.Minute * 15).Unix(),
+		"aud": s.auth.Oauth2Config.ClientID,
+		"nbf": time.Now().Add(time.Minute * -5).Unix(),
+		"iat": time.Now().Unix(),
+	}
+	newToken := jwt.NewWithClaims(jwt.SigningMethodHS256, newClaims)
+
+	signedToken, err := newToken.SignedString([]byte(s.auth.Oauth2Config.ClientSecret))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed in token sign"})
+		return
+	}
+
+	c.SetCookie("token", signedToken, 3600, "/", s.host, false, true)
 
 	c.JSON(http.StatusOK, gin.H{
-		"access_token": token.AccessToken,
-		"id_token":     rawIDToken,
+		"id_token": signedToken,
 	})
 }
 
@@ -106,21 +131,29 @@ func (s *Server) authMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		token := strings.TrimPrefix(authHeader, "Bearer ")
-		if token == "" {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid token format"})
+		tokenString := authHeader[len("Bearer "):]
+
+		// Parse e verifica il token
+		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+			// Controlla il metodo di firma
+			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+				return nil, fmt.Errorf("Unexpected signing method: %v", token.Method)
+			}
+			// Restituisci la chiave usata per verificare
+			return []byte(s.auth.Oauth2Config.ClientSecret), nil
+		})
+
+		if err != nil || !token.Valid {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
+			c.Abort()
 			return
 		}
 
-		idToken, err := s.auth.OidcVerifier.Verify(c.Request.Context(), token)
-		if err != nil {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
-			return
-		}
-
-		var claims map[string]interface{}
-		if err := idToken.Claims(&claims); err != nil {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Failed to parse token claims"})
+		// Recupera i claims
+		claims, ok := token.Claims.(jwt.MapClaims)
+		if !ok {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid claims"})
+			c.Abort()
 			return
 		}
 

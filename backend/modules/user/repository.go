@@ -128,6 +128,21 @@ func (r *Repository) ReadByUniqueName(uniqueName string) (*User, error) {
 	return &user, nil
 }
 
+func (r *Repository) ReadByMail(mail string) (*User, error) {
+	cUsers := r.db.Collection("users")
+
+	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
+	defer cancel()
+
+	var user User
+	err := cUsers.FindOne(ctx, bson.M{"mail": mail}).Decode(&user)
+	if err != nil {
+		return nil, err
+	}
+
+	return &user, nil
+}
+
 func (r *Repository) Update(user *User) error {
 	cUsers := r.db.Collection("users")
 
