@@ -9,21 +9,24 @@ import (
 
 	_ "github.com/joho/godotenv/autoload"
 
+	"harmony/internal/autentication"
 	"harmony/internal/database"
 )
 
 type Server struct {
 	port int
-
-	db database.Service
+	host string
+	db   database.Service
+	auth autentication.Service
 }
 
 func NewServer() *http.Server {
 	port, _ := strconv.Atoi(os.Getenv("PORT"))
 	NewServer := &Server{
 		port: port,
-
-		db: database.New(),
+		host: os.Getenv("APP_HOST"),
+		db:   database.New(),
+		auth: autentication.New(),
 	}
 
 	// Declare Server config

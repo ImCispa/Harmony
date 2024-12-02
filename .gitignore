@@ -6,6 +6,9 @@
 go.work
 go.work.sum
 
+# file env
+*.env
+
 # Dependency directories
 /vendor/
 
