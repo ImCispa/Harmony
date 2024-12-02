@@ -6,17 +6,14 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type Handler struct {
-	DB   *mongo.Client
 	Repo *Repository
 }
 
 func NewHandler(db *database.Service) *Handler {
 	return &Handler{
-		DB:   db.Mongo,
 		Repo: NewRepository(db.Mongo),
 	}
 }
@@ -117,7 +114,7 @@ func (h *Handler) Update(c *gin.Context) {
 	// update data
 	user.Name = rb.Name
 
-	err = h.Repo.Update(*user)
+	err = h.Repo.Update(user)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update user"})
 		return

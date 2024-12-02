@@ -1,8 +1,6 @@
 package server
 
 import (
-	"context"
-	"errors"
 	"fmt"
 	"harmony/internal/database"
 	"harmony/modules/user"
@@ -12,119 +10,64 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type Handler struct {
-	DB *mongo.Client
+	Repo     *Repository
+	RepoUser *user.Repository
 }
 
 func NewHandler(db *database.Service) *Handler {
-	return &Handler{DB: db.Mongo}
+	return &Handler{
+		Repo:     NewRepository(db.Mongo),
+		RepoUser: user.NewRepository(db.Mongo),
+	}
 }
 
-var databaseName = "harmony"
-var collectionServers = "servers"
-var collectionServerCodes = "server_codes"
-var collectionUsers = "users"
-
 func (h *Handler) Create(c *gin.Context) {
-	var server Server
+	type RequestBody struct {
+		Name    string `json:"name"`
+		Image   string `json:"image"`
+		OwnerID string `json:"owner_id"` // TODO: owner should be retreived from token
+	}
+	var rb RequestBody
 
 	// validate input
-	if err := c.ShouldBindJSON(&server); err != nil {
+	if err := c.ShouldBindJSON(&rb); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	if len(server.Name) == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Name required"})
+	if check, errMsg := IsNameValid(rb.Name); !check {
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsg})
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	// check user exist
-	cUser := h.DB.Database(databaseName).Collection(collectionUsers)
-	var user user.User
-	err := cUser.FindOne(ctx, bson.M{"unique_name": server.OwnerID}).Decode(&user)
+	// check if user exist
+	user, err := h.RepoUser.ReadByUniqueName(rb.OwnerID)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Failed to retreive user"})
 		return
 	}
 
-	// check server codes to get the one to use for the new server
-	cServerCodes := h.DB.Database(databaseName).Collection(collectionServerCodes)
-	var serverCode ServerCode
-	newServerName := false
-	err = cServerCodes.FindOne(ctx, bson.M{"name": server.Name}).Decode(&serverCode)
-	if err != nil {
-		if !errors.Is(err, mongo.ErrNoDocuments) {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check server name"})
-			return
-		}
-		newServerName = true
-	}
+	// create
+	server := NewServer(rb.Name, rb.Image, rb.OwnerID)
 
-	newCode := utils.GetRandomCode(serverCode.Codes)
-	if newServerName {
-		_, err := cServerCodes.InsertOne(ctx, bson.M{
-			"name":  server.Name,
-			"codes": []int{newCode},
-		})
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create server codes"})
-			return
-		}
-	} else {
-		update := bson.M{
-			"$set": bson.M{
-				"codes": append(serverCode.Codes, newCode),
-			},
-		}
-		_, err = cServerCodes.UpdateByID(ctx, serverCode.ID, update)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update server codes"})
-			return
-		}
-	}
-
-	// creates new server
-	server.GenerateUniqueName(newCode)
-	cServers := h.DB.Database(databaseName).Collection(collectionServers)
-	result, err := cServers.InsertOne(ctx, bson.M{
-		"name":        server.Name,
-		"image":       server.Image,
-		"owner_id":    server.OwnerID,
-		"unique_name": server.UniqueName,
-		"users":       []string{server.OwnerID},
-	})
+	err = h.Repo.Create(&server)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create server"})
 		return
 	}
 
-	update := bson.M{
-		"$set": bson.M{
-			"servers": append(user.Servers, server.UniqueName),
-		},
-	}
-	_, err = cUser.UpdateByID(ctx, user.ID, update)
+	// insert in user the new server created
+	user.Servers = append(user.Servers, server.UniqueName)
+	err = h.RepoUser.Update(user)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update user"})
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{
-		"id":          result.InsertedID,
-		"name":        server.Name,
-		"image":       server.Image,
-		"owner_id":    server.OwnerID,
-		"unique_name": server.UniqueName,
-		"users":       []string{server.OwnerID},
-	})
+	c.JSON(http.StatusCreated, server.Print())
 }
 
 func (h *Handler) Read(c *gin.Context) {
@@ -137,30 +80,23 @@ func (h *Handler) Read(c *gin.Context) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
 	// search server
-	cServer := h.DB.Database(databaseName).Collection(collectionServers)
-	var server Server
-	err = cServer.FindOne(ctx, bson.M{"_id": objectId}).Decode(&server)
+	server, err := h.Repo.Read(objectId)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Failed to retreive server"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"id":          server.ID,
-		"name":        server.Name,
-		"image":       server.Image,
-		"owner_id":    server.OwnerID,
-		"unique_name": server.UniqueName,
-		"users":       server.Users,
-	})
+	c.JSON(http.StatusOK, server.Print())
 }
 
 func (h *Handler) Update(c *gin.Context) {
 	id := c.Param("id")
+	type RequestBody struct {
+		Name  string `json:"name"`
+		Image string `json:"image"`
+	}
+	var rb RequestBody
 
 	// validate input
 	objectId, err := primitive.ObjectIDFromHex(id)
@@ -168,50 +104,33 @@ func (h *Handler) Update(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	var in Server
-	if err := c.ShouldBindJSON(&in); err != nil {
+	if err := c.ShouldBindJSON(&rb); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
+	if check, errMsg := IsNameValid(rb.Name); !check {
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsg})
+		return
+	}
 
 	// search server
-	cServer := h.DB.Database(databaseName).Collection(collectionServers)
-	var server Server
-	err = cServer.FindOne(ctx, bson.M{"_id": objectId}).Decode(&server)
+	server, err := h.Repo.Read(objectId)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Failed to retreive server"})
 		return
 	}
 
 	// update data
-	server.Name = in.Name
-	server.Image = in.Image
-	server.OwnerID = in.OwnerID
+	server.Name = rb.Name
+	server.Image = rb.Image
 
-	update := bson.M{
-		"$set": bson.M{
-			"name":     server.Name,
-			"image":    server.Image,
-			"owner_id": server.OwnerID,
-		},
-	}
-	_, err = cServer.UpdateByID(ctx, objectId, update)
+	err = h.Repo.Update(server)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update server"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"id":          server.ID,
-		"name":        server.Name,
-		"image":       server.Image,
-		"owner_id":    server.OwnerID,
-		"unique_name": server.UniqueName,
-		"users":       server.Users,
-	})
+	c.JSON(http.StatusOK, server.Print())
 }
 
 func (h *Handler) Delete(c *gin.Context) {
@@ -224,19 +143,14 @@ func (h *Handler) Delete(c *gin.Context) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
 	// try deleting
-	cServer := h.DB.Database(databaseName).Collection(collectionServers)
-	r, err := cServer.DeleteOne(ctx, bson.M{"_id": objectId})
+	isDeleted, err := h.Repo.Delete(objectId)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete server"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete user"})
 		return
 	}
-
-	if r.DeletedCount == 0 {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Failed to retreive server"})
+	if !isDeleted {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Failed to retreive user"})
 		return
 	}
 
@@ -253,13 +167,8 @@ func (h *Handler) Invite(c *gin.Context) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
 	// search server
-	cServer := h.DB.Database(databaseName).Collection(collectionServers)
-	var server Server
-	err = cServer.FindOne(ctx, bson.M{"_id": objectId}).Decode(&server)
+	server, err := h.Repo.Read(objectId)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Failed to retreive server"})
 		return
@@ -299,22 +208,15 @@ func (h *Handler) Join(c *gin.Context) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
 	// search server
-	cServer := h.DB.Database(databaseName).Collection(collectionServers)
-	var server Server
-	err = cServer.FindOne(ctx, bson.M{"_id": objectId}).Decode(&server)
+	server, err := h.Repo.Read(objectId)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Failed to retreive server"})
 		return
 	}
 
 	// search user
-	cUser := h.DB.Database(databaseName).Collection(collectionUsers)
-	var user user.User
-	err = cUser.FindOne(ctx, bson.M{"unique_name": userName}).Decode(&user)
+	user, err := h.RepoUser.ReadByUniqueName(userName)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Failed to retreive user"})
 		return
@@ -330,23 +232,13 @@ func (h *Handler) Join(c *gin.Context) {
 	server.Users = append(server.Users, user.UniqueName)
 	user.Servers = append(user.Servers, server.UniqueName)
 
-	update := bson.M{
-		"$set": bson.M{
-			"users": server.Users,
-		},
-	}
-	_, err = cServer.UpdateByID(ctx, server.ID, update)
+	err = h.Repo.Update(server)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update server"})
 		return
 	}
 
-	update = bson.M{
-		"$set": bson.M{
-			"servers": user.Servers,
-		},
-	}
-	_, err = cUser.UpdateByID(ctx, user.ID, update)
+	err = h.RepoUser.Update(user)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update user"})
 		return
@@ -371,22 +263,15 @@ func (h *Handler) Leave(c *gin.Context) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
 	// search server
-	cServer := h.DB.Database(databaseName).Collection(collectionServers)
-	var server Server
-	err = cServer.FindOne(ctx, bson.M{"_id": objectId}).Decode(&server)
+	server, err := h.Repo.Read(objectId)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Failed to retreive server"})
 		return
 	}
 
 	// search user
-	cUser := h.DB.Database(databaseName).Collection(collectionUsers)
-	var user user.User
-	err = cUser.FindOne(ctx, bson.M{"unique_name": userName}).Decode(&user)
+	user, err := h.RepoUser.ReadByUniqueName(userName)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Failed to retreive user"})
 		return
@@ -407,23 +292,13 @@ func (h *Handler) Leave(c *gin.Context) {
 	server.Users = utils.Remove(server.Users, user.UniqueName)
 	user.Servers = utils.Remove(user.Servers, server.UniqueName)
 
-	update := bson.M{
-		"$set": bson.M{
-			"users": server.Users,
-		},
-	}
-	_, err = cServer.UpdateByID(ctx, server.ID, update)
+	err = h.Repo.Update(server)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update server"})
 		return
 	}
 
-	update = bson.M{
-		"$set": bson.M{
-			"servers": user.Servers,
-		},
-	}
-	_, err = cUser.UpdateByID(ctx, user.ID, update)
+	err = h.RepoUser.Update(user)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update user"})
 		return

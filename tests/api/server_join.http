@@ -1,2 +1,2 @@
-POST http://localhost:8080/servers/674b2ae5416040c38d8c526d/join?t=1732979754833
-x-harmony-username: Cispa:7173
+POST http://localhost:8080/servers/674dc6276be95aed48712bd2/join?t=1733150986423
+x-harmony-username: Cispa:6802

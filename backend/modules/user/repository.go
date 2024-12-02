@@ -89,7 +89,6 @@ func (r *Repository) Create(user *User) error {
 		"mail":        user.Mail,
 		"unique_name": user.UniqueName,
 	})
-
 	if err != nil {
 		return err
 	}
@@ -114,7 +113,22 @@ func (r *Repository) Read(id primitive.ObjectID) (*User, error) {
 	return &user, nil
 }
 
-func (r *Repository) Update(user User) error {
+func (r *Repository) ReadByUniqueName(uniqueName string) (*User, error) {
+	cUsers := r.db.Collection("users")
+
+	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
+	defer cancel()
+
+	var user User
+	err := cUsers.FindOne(ctx, bson.M{"unique_name": uniqueName}).Decode(&user)
+	if err != nil {
+		return nil, err
+	}
+
+	return &user, nil
+}
+
+func (r *Repository) Update(user *User) error {
 	cUsers := r.db.Collection("users")
 
 	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)

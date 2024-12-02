@@ -4,5 +4,5 @@ Content-Type: application/json
 {
   "name": "GWP",
   "image": "image.png",
-  "owner_id": "Cispa:7173"
+  "owner_id": "Cispa:6802"
 }
