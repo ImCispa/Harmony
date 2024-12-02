@@ -27,9 +27,8 @@ func NewHandler(db *database.Service) *Handler {
 
 func (h *Handler) Create(c *gin.Context) {
 	type RequestBody struct {
-		Name    string `json:"name"`
-		Image   string `json:"image"`
-		OwnerID string `json:"owner_id"` // TODO: owner should be retreived from token
+		Name  string `json:"name"`
+		Image string `json:"image"`
 	}
 	var rb RequestBody
 
@@ -44,14 +43,19 @@ func (h *Handler) Create(c *gin.Context) {
 	}
 
 	// check if user exist
-	user, err := h.RepoUser.ReadByUniqueName(rb.OwnerID)
+	sub, ok := utils.GetSub(c)
+	if !ok {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to retreive user"})
+		return
+	}
+	user, err := h.RepoUser.ReadByUniqueName(sub)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Failed to retreive user"})
 		return
 	}
 
 	// create
-	server := NewServer(rb.Name, rb.Image, rb.OwnerID)
+	server := NewServer(rb.Name, rb.Image, user.UniqueName)
 
 	err = h.Repo.Create(&server)
 	if err != nil {
@@ -185,8 +189,12 @@ func (h *Handler) Invite(c *gin.Context) {
 func (h *Handler) Join(c *gin.Context) {
 	id := c.Param("id")
 	tOriginale := c.DefaultQuery("t", "")
-	// todo: need to use auth
-	userName := c.GetHeader("x-harmony-username")
+
+	sub, ok := utils.GetSub(c)
+	if !ok {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to retreive user"})
+		return
+	}
 
 	// validate input
 	objectId, err := primitive.ObjectIDFromHex(id)
@@ -203,10 +211,6 @@ func (h *Handler) Join(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Join invite expired"})
 		return
 	}
-	if userName == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing user"})
-		return
-	}
 
 	// search server
 	server, err := h.Repo.Read(objectId)
@@ -216,7 +220,7 @@ func (h *Handler) Join(c *gin.Context) {
 	}
 
 	// search user
-	user, err := h.RepoUser.ReadByUniqueName(userName)
+	user, err := h.RepoUser.ReadByUniqueName(sub)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Failed to retreive user"})
 		return
@@ -249,17 +253,17 @@ func (h *Handler) Join(c *gin.Context) {
 
 func (h *Handler) Leave(c *gin.Context) {
 	id := c.Param("id")
-	// todo: need to use auth
-	userName := c.GetHeader("x-harmony-username")
+
+	sub, ok := utils.GetSub(c)
+	if !ok {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to retreive user"})
+		return
+	}
 
 	// validate input
 	objectId, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-	if userName == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing user"})
 		return
 	}
 
@@ -271,13 +275,13 @@ func (h *Handler) Leave(c *gin.Context) {
 	}
 
 	// search user
-	user, err := h.RepoUser.ReadByUniqueName(userName)
+	user, err := h.RepoUser.ReadByUniqueName(sub)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Failed to retreive user"})
 		return
 	}
 
-	if userName == server.OwnerID {
+	if user.UniqueName == server.OwnerID {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Owner cannot leave server"})
 		return
 	}

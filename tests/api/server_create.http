@@ -1,5 +1,6 @@
 POST http://localhost:8080/servers
 Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJZOEFPdUVGVmZxeXdvanBET0RtYjZsTUpWeVhMNkhsUSIsImV4cCI6MTczMzE3MDExOCwiaWF0IjoxNzMzMTY5MjE4LCJuYmYiOjE3MzMxNjg5MTgsInN1YiI6IkNpc3BhOjE0MDkifQ.boV2DmbIahzf2JbPKbPLpttIseY7TOJ0XKad7HtaEkg
 
 {
   "name": "GWP",
