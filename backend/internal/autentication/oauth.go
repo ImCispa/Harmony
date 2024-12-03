@@ -5,7 +5,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/coreos/go-oidc"
+	"github.com/coreos/go-oidc/v3/oidc"
 	_ "github.com/joho/godotenv/autoload"
 	"golang.org/x/oauth2"
 )
