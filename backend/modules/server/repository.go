@@ -66,7 +66,7 @@ func (r *Repository) Create(server *Server) error {
 
 	// creates new server
 	server.GenerateUniqueName(newCode)
-	server.Users = []string{server.OwnerID}
+	server.Users = map[string]string{server.OwnerID: "owner"}
 	result, err := cServers.InsertOne(ctx, bson.M{
 		"name":        server.Name,
 		"image":       server.Image,

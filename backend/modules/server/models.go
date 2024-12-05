@@ -13,7 +13,7 @@ type Server struct {
 	Image      string             `bson:"image"`
 	OwnerID    string             `bson:"owner_id"`
 	UniqueName string             `bson:"unique_name"`
-	Users      []string           `bson:"users"`
+	Users      map[string]string  `bson:"users"`
 }
 
 func NewServer(name string, image string, ownerId string) Server {
@@ -21,6 +21,9 @@ func NewServer(name string, image string, ownerId string) Server {
 		Name:    name,
 		Image:   image,
 		OwnerID: ownerId,
+		Users: map[string]string{
+			ownerId: "owner",
+		},
 	}
 }
 

@@ -64,7 +64,13 @@ func (h *Handler) Create(c *gin.Context) {
 	}
 
 	// insert in user the new server created
-	user.Servers = append(user.Servers, server.UniqueName)
+	if user.Servers == nil {
+		user.Servers = map[string]string{
+			server.UniqueName: "owner",
+		}
+	} else {
+		user.Servers[server.UniqueName] = "owner"
+	}
 	err = h.RepoUser.Update(user)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update user"})
@@ -227,14 +233,22 @@ func (h *Handler) Join(c *gin.Context) {
 	}
 
 	// check already in the list
-	if utils.Contains(server.Users, user.UniqueName) || utils.Contains(user.Servers, server.UniqueName) {
+	_, existsInServer := server.Users[user.UniqueName]
+
+	if existsInServer {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "User already joined server"})
 		return
 	}
 
 	// todo: need to take user from access token
-	server.Users = append(server.Users, user.UniqueName)
-	user.Servers = append(user.Servers, server.UniqueName)
+	server.Users[user.UniqueName] = "member"
+	if user.Servers == nil {
+		user.Servers = map[string]string{
+			server.UniqueName: "member",
+		}
+	} else {
+		user.Servers[server.UniqueName] = "owner"
+	}
 
 	err = h.Repo.Update(server)
 	if err != nil {
@@ -287,14 +301,16 @@ func (h *Handler) Leave(c *gin.Context) {
 	}
 
 	// check already in the list
-	if !utils.Contains(server.Users, user.UniqueName) && !utils.Contains(user.Servers, server.UniqueName) {
+	_, existsInServer := server.Users[user.UniqueName]
+
+	if !existsInServer {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "User not in the server"})
 		return
 	}
 
 	// todo: need to take user from access token
-	server.Users = utils.Remove(server.Users, user.UniqueName)
-	user.Servers = utils.Remove(user.Servers, server.UniqueName)
+	delete(server.Users, user.UniqueName)
+	delete(user.Servers, server.UniqueName)
 
 	err = h.Repo.Update(server)
 	if err != nil {
