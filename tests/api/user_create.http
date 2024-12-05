@@ -2,6 +2,6 @@ POST http://localhost:8080/user/registration
 Content-Type: application/json
 
 {
-  "name": "CispaCopy",
-  "mail": "christian.perico.1997.falsissimo@gmail.com"
+  "name": "Cispa",
+  "mail": "christian.perico.1997@gmail.com"
 }

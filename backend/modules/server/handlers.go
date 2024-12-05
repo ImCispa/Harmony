@@ -130,6 +130,12 @@ func (h *Handler) Update(c *gin.Context) {
 		return
 	}
 
+	// role check
+	if utils.IsRoleAtLeastAdmin(c, server.UniqueName) {
+		c.Status(http.StatusUnauthorized)
+		return
+	}
+
 	// update data
 	server.Name = rb.Name
 	server.Image = rb.Image
@@ -153,14 +159,26 @@ func (h *Handler) Delete(c *gin.Context) {
 		return
 	}
 
+	server, err := h.Repo.Read(objectId)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retreive server"})
+		return
+	}
+
+	// role check
+	if utils.IsRoleAdmin(c, server.UniqueName) {
+		c.Status(http.StatusUnauthorized)
+		return
+	}
+
 	// try deleting
 	isDeleted, err := h.Repo.Delete(objectId)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete user"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete server"})
 		return
 	}
 	if !isDeleted {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Failed to retreive user"})
+		c.JSON(http.StatusNotFound, gin.H{"error": "Failed to retreive server"})
 		return
 	}
 
@@ -181,6 +199,12 @@ func (h *Handler) Invite(c *gin.Context) {
 	server, err := h.Repo.Read(objectId)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Failed to retreive server"})
+		return
+	}
+
+	// role check
+	if utils.IsRoleAtLeastMember(c, server.UniqueName) {
+		c.Status(http.StatusUnauthorized)
 		return
 	}
 

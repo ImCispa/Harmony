@@ -102,11 +102,12 @@ func (s *Server) callbackHandler(c *gin.Context) {
 	}
 
 	newClaims := jwt.MapClaims{
-		"sub": user.UniqueName,
-		"exp": time.Now().Add(time.Minute * 15).Unix(),
-		"aud": s.auth.Oauth2Config.ClientID,
-		"nbf": time.Now().Add(time.Minute * -5).Unix(),
-		"iat": time.Now().Unix(),
+		"sub":   user.UniqueName,
+		"exp":   time.Now().Add(time.Minute * 15).Unix(),
+		"aud":   s.auth.Oauth2Config.ClientID,
+		"nbf":   time.Now().Add(time.Minute * -5).Unix(),
+		"iat":   time.Now().Unix(),
+		"roles": user.Servers,
 	}
 	newToken := jwt.NewWithClaims(jwt.SigningMethodHS256, newClaims)
 
