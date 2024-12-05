@@ -13,7 +13,7 @@ type User struct {
 	Name       string             `bson:"name" json:"name"`
 	Mail       string             `bson:"mail" json:"mail"`
 	UniqueName string             `bson:"unique_name"`
-	Servers    []string           `bson:"servers"`
+	Servers    map[string]string  `bson:"servers"`
 }
 
 func NewUser(name string, mail string) User {

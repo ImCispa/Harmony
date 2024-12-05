@@ -1,9 +1,8 @@
 POST http://localhost:8080/servers
 Content-Type: application/json
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJZOEFPdUVGVmZxeXdvanBET0RtYjZsTUpWeVhMNkhsUSIsImV4cCI6MTczMzI1MjMwNCwiaWF0IjoxNzMzMjUxNDA0LCJuYmYiOjE3MzMyNTExMDQsInN1YiI6IkNpc3BhOjE0MDkifQ.A--R6-pHGuXf7GpvYxvAI0CZbtPTdib3XGyrEB3niNE
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJZOEFPdUVGVmZxeXdvanBET0RtYjZsTUpWeVhMNkhsUSIsImV4cCI6MTczMzQyNzM3NCwiaWF0IjoxNzMzNDI2NDc0LCJuYmYiOjE3MzM0MjYxNzQsInJvbGVzIjpudWxsLCJzdWIiOiJDaXNwYToxMTM2In0.IDiLCkCYMzr6xIsfFHk2AHUO6vrT5gMn5-WZSuEuR7c
 
 {
   "name": "GWP",
-  "image": "image.png",
-  "owner_id": "Cispa:6802"
+  "image": "image.png"
 }

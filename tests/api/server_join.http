@@ -1,2 +1,3 @@
-POST http://localhost:8080/servers/674dc6276be95aed48712bd2/join?t=1733150986423
-x-harmony-username: Cispa:6802
+POST http://localhost:8080/servers/6751f962d97d9c98be0cad26/join?t=1733425951781
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJZOEFPdUVGVmZxeXdvanBET0RtYjZsTUpWeVhMNkhsUSIsImV4cCI6MTczMzQyNjE2OCwiaWF0IjoxNzMzNDI1MjY4LCJuYmYiOjE3MzM0MjQ5NjgsInN1YiI6IkNpc3BhOjMzMjMifQ.TLdNdsLAf2uvBhAi5ELjQBrhJRPiF9UC5KsPHyTureo
+
